@@ -89,10 +89,10 @@ class ProductService:
         """Actualizar un producto existente con validación de categoría"""
         doc_ref = cls._get_db().collection("products").document(product_id)
         
-        if not doc_ref.get().exists:
-            raise ValueError("Producto no encontrado")
-        
         doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise ValueError("Producto no encontrado")
         
         if doc.to_dict().get("estado") == "inactivo":
             raise ValueError("No se puede modificar un producto inactivo")
@@ -115,7 +115,8 @@ class ProductService:
     @classmethod
     def get_by_category(cls, category_id: str) -> List[Dict]:
         """Obtener todos los productos de una categoría específica"""
-        if not cls._get_db().collection("categories").document(category_id).get().exists:
+        category_doc = cls._get_db().collection("categories").document(category_id).get()
+        if not category_doc.exists:
             raise ValueError("Categoría no encontrada")
         
         products_ref = cls._get_db().collection("products")
@@ -128,7 +129,9 @@ class ProductService:
         """Eliminar un producto"""
         doc_ref = cls._get_db().collection("products").document(product_id)
         
-        if not doc_ref.get().exists:
+        doc = doc_ref.get()
+        
+        if not doc.exists:
             raise ValueError("Producto no encontrado")
         
         doc_ref.delete()
@@ -303,10 +306,10 @@ class CategoryService:
         """Actualizar una categoría existente"""
         doc_ref = cls._get_db().collection("categories").document(category_id)
         
-        if not doc_ref.get().exists:
-            raise ValueError("Categoría no encontrada")
-        
         doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise ValueError("Categoría no encontrada")
         
         if doc.to_dict().get("estado") == "inactivo":
             raise ValueError("No se puede modificar una categoría inactiva")
@@ -326,12 +329,15 @@ class CategoryService:
         category_ref = cls._get_db().collection("categories").document(category_id)
         products_ref = cls._get_db().collection("products")
         
-        if not category_ref.get().exists:
+        doc = category_ref.get()
+        
+        if not doc.exists:
             raise ValueError("Categoría no encontrada")
         
         # Crear categoría uncategorized si no existe
         uncategorized = cls._get_db().collection("categories").document("uncategorized")
-        if not uncategorized.get().exists:
+        uncategorized_doc = uncategorized.get()
+        if not uncategorized_doc.exists:
             uncategorized.set({
                 "name": "Uncategorized",
                 "description": "Productos sin categoría asignada",
