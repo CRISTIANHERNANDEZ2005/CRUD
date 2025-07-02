@@ -207,14 +207,12 @@ class ProductService:
 
     @classmethod
     def set_status(cls, product_id: str, status: str) -> Dict:
-        """Cambia el estado de un producto individual"""
+        """Cambia el estado de un producto individual (solo actualiza el campo 'estado')"""
         doc_ref = cls._get_db().collection("products").document(product_id)
         doc = doc_ref.get()
         if not doc.exists:
             raise ValueError("Producto no encontrado")
-        batch = cls._get_db().batch()
-        batch.update(doc_ref, {"estado": status, "updated_at": SERVER_TIMESTAMP})
-        batch.commit()
+        doc_ref.update({"estado": status, "updated_at": SERVER_TIMESTAMP})
         return {"id": product_id, "estado": status}
 
 
@@ -380,17 +378,10 @@ class CategoryService:
 
     @classmethod
     def set_status(cls, category_id: str, status: str) -> Dict:
-        """Cambia el estado de una categoría y de todos sus productos"""
+        """Cambia el estado de una categoría (solo actualiza el campo 'estado')"""
         doc_ref = cls._get_db().collection("categories").document(category_id)
         doc = doc_ref.get()
         if not doc.exists:
             raise ValueError("Categoría no encontrada")
-        batch = cls._get_db().batch()
-        batch.update(doc_ref, {"estado": status, "updated_at": SERVER_TIMESTAMP})
-        # Cambiar estado de todos los productos de la categoría
-        products_ref = cls._get_db().collection("products")
-        query = products_ref.where("category_id", "==", category_id)
-        for prod in query.stream():
-            batch.update(prod.reference, {"estado": status, "updated_at": SERVER_TIMESTAMP})
-        batch.commit()
+        doc_ref.update({"estado": status, "updated_at": SERVER_TIMESTAMP})
         return {"id": category_id, "estado": status}
