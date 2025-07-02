@@ -233,22 +233,20 @@ class CategoryService:
 
     @classmethod
     def validate_category_data(cls, data: Dict) -> Dict:
-        """Validación de datos de categoría"""
-        if "name" not in data:
+        """Validación de datos de categoría: solo permite 'name' y 'description'"""
+        allowed_fields = {"name", "description"}
+        filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+        if "name" not in filtered_data:
             raise ValueError("El campo 'name' es obligatorio")
-        
-        if not isinstance(data["name"], str) or len(data["name"]) > 50:
+        if not isinstance(filtered_data["name"], str) or len(filtered_data["name"]) > 50:
             raise ValueError("Nombre debe ser string (max 50 caracteres)")
-        
-        if "description" in data and (not isinstance(data["description"], str) or len(data["description"]) > 200):
+        if "description" in filtered_data and (not isinstance(filtered_data["description"], str) or len(filtered_data["description"]) > 200):
             raise ValueError("Descripción debe ser string (max 200 caracteres)")
-        
-        validated_data = data.copy()
+        validated_data = filtered_data.copy()
         validated_data["created_at"] = SERVER_TIMESTAMP
         validated_data["updated_at"] = SERVER_TIMESTAMP
         if "estado" not in validated_data:
             validated_data["estado"] = "activo"
-        
         return validated_data
 
     @classmethod
