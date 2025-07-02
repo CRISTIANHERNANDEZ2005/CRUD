@@ -43,9 +43,11 @@ class ProductService:
         
         # Verificar categoría existente o crear "uncategorized" si no existe
         category_ref = cls._get_db().collection("categories").document(data["category_id"])
-        if not category_ref.get().exists:
+        category_doc = category_ref.get()
+        if not category_doc.exists:
             uncategorized_ref = cls._get_db().collection("categories").document("uncategorized")
-            if not uncategorized_ref.get().exists:
+            uncategorized_doc = uncategorized_ref.get()
+            if not uncategorized_doc.exists:
                 uncategorized_ref.set({
                     "name": "Uncategorized",
                     "description": "Productos sin categoría asignada",
