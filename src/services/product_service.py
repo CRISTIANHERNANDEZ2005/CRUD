@@ -30,18 +30,13 @@ class ProductService:
     @classmethod
     def validate_product_data(cls, data: Dict) -> Dict:
         required_fields = ["name", "price", "category_id"]
-        
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Campo requerido faltante: {field}")
-        
         if not isinstance(data["name"], str) or len(data["name"]) > 100:
             raise ValueError("Nombre debe ser string (max 100 caracteres)")
-        
         if not isinstance(data["price"], (int, float)) or data["price"] <= 0:
             raise ValueError("Precio debe ser número positivo")
-        
-        # Verificar categoría existente o crear "uncategorized" si no existe
         category_ref = cls._get_db().collection("categories").document(data["category_id"])
         category_doc = category_ref.get()
         if not category_doc.exists:
@@ -52,20 +47,14 @@ class ProductService:
                     "name": "Uncategorized",
                     "description": "Productos sin categoría asignada",
                     "created_at": SERVER_TIMESTAMP,
-                    "updated_at": SERVER_TIMESTAMP,
-                    "estado": "activo"
+                    "updated_at": SERVER_TIMESTAMP
                 })
             data["category_id"] = "uncategorized"
-        
         if "description" in data and (not isinstance(data["description"], str) or len(data["description"]) > 500):
             raise ValueError("Descripción debe ser string (max 500 caracteres)")
-        
         validated_data = data.copy()
         validated_data["created_at"] = SERVER_TIMESTAMP
         validated_data["updated_at"] = SERVER_TIMESTAMP
-        if "estado" not in validated_data:
-            validated_data["estado"] = "activo"
-        
         return validated_data
 
     @classmethod
@@ -73,56 +62,36 @@ class ProductService:
         validated_data = cls.validate_product_data(data)
         doc_ref = cls._get_db().collection("products").document()
         doc_ref.set(validated_data)
-        
-        # Obtener datos serializables
         product_data = {"id": doc_ref.id, **cls._serialize_firestore_data(validated_data)}
-        
-        # Obtener categoría relacionada
         category = cls._get_db().collection("categories").document(validated_data["category_id"]).get()
         if category.exists:
             product_data["category"] = {"id": category.id, **cls._serialize_firestore_data(category.to_dict())}
-        
         return product_data
 
     @classmethod
     def update(cls, product_id: str, data: Dict) -> Dict:
-        """Actualizar un producto existente con validación de categoría"""
         doc_ref = cls._get_db().collection("products").document(product_id)
-        
         doc = doc_ref.get()
-        
         if not doc.exists:
             raise ValueError("Producto no encontrado")
-        
-        if doc.to_dict().get("estado") == "inactivo":
-            raise ValueError("No se puede modificar un producto inactivo")
-        
         validated_data = cls.validate_product_data(data)
         validated_data["updated_at"] = SERVER_TIMESTAMP
-        
         doc_ref.update(validated_data)
-        
-        # Obtener datos actualizados con categoría
         updated_doc = doc_ref.get()
         product_data = {"id": updated_doc.id, **updated_doc.to_dict()}
-        
         category = cls._get_db().collection("categories").document(validated_data["category_id"]).get()
         if category.exists:
             product_data["category"] = {"id": category.id, **category.to_dict()}
-        
         return product_data
 
     @classmethod
     def get_by_category(cls, category_id: str) -> List[Dict]:
-        """Obtener todos los productos de una categoría específica"""
         category_doc = cls._get_db().collection("categories").document(category_id).get()
         if not category_doc.exists:
             raise ValueError("Categoría no encontrada")
-        
         products_ref = cls._get_db().collection("products")
-        query = products_ref.where("category_id", "==", category_id).where("estado", "==", "activo")
-        
-        return [{"id": doc.id, **doc.to_dict()} for doc in query.stream()] 
+        query = products_ref.where("category_id", "==", category_id)
+        return [{"id": doc.id, **doc.to_dict()} for doc in query.stream()]
 
     @classmethod
     def delete(cls, product_id: str) -> bool:
@@ -188,7 +157,7 @@ class ProductService:
     def get_all(cls, include_category: bool = False) -> List[Dict]:
         products_ref = cls._get_db().collection("products")
         products = []
-        for doc in products_ref.where("estado", "==", "activo").stream():
+        for doc in products_ref.stream():
             product_data = {"id": doc.id, **doc.to_dict()}
             if include_category:
                 category = cls._get_db().collection("categories").document(product_data.get("category_id")).get()
@@ -201,7 +170,7 @@ class ProductService:
     def get_by_id(cls, product_id: str, include_category: bool = False) -> Optional[Dict]:
         doc_ref = cls._get_db().collection("products").document(product_id)
         doc = doc_ref.get()
-        if not doc.exists or doc.to_dict().get("estado") != "activo":
+        if not doc.exists:
             return None
         product_data = {"id": doc.id, **doc.to_dict()}
         if include_category:
@@ -210,30 +179,18 @@ class ProductService:
                 product_data["category"] = {"id": category.id, **category.to_dict()}
         return product_data
 
-    @classmethod
-    def set_status(cls, product_id: str, status: str) -> Dict:
-        """Cambia el estado de un producto individual (solo actualiza el campo 'estado')"""
-        doc_ref = cls._get_db().collection("products").document(product_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise ValueError("Producto no encontrado")
-        doc_ref.update({"estado": status, "updated_at": SERVER_TIMESTAMP})
-        return {"id": product_id, "estado": status}
-
 
 class CategoryService:
     _db = None
 
     @classmethod
     def _get_db(cls):
-        """Obtiene la instancia de Firestore (singleton)"""
         if cls._db is None:
             cls._db = get_firestore_client()
         return cls._db
 
     @classmethod
     def validate_category_data(cls, data: Dict) -> Dict:
-        """Validación de datos de categoría: solo permite 'name' y 'description'"""
         allowed_fields = {"name", "description"}
         filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
         if "name" not in filtered_data:
@@ -245,18 +202,13 @@ class CategoryService:
         validated_data = filtered_data.copy()
         validated_data["created_at"] = SERVER_TIMESTAMP
         validated_data["updated_at"] = SERVER_TIMESTAMP
-        if "estado" not in validated_data:
-            validated_data["estado"] = "activo"
         return validated_data
 
     @classmethod
     def create(cls, data: Dict) -> Dict:
         validated_data = cls.validate_category_data(data)
-        # Solo guardar los campos permitidos
-        allowed_fields = {"name", "description", "created_at", "updated_at", "estado"}
-        filtered_data = {k: v for k, v in validated_data.items() if k in allowed_fields}
         doc_ref = cls._get_db().collection("categories").document()
-        doc_ref.set(filtered_data)
+        doc_ref.set(validated_data)
         doc = doc_ref.get()
         return {"id": doc.id, **doc.to_dict()}
 
@@ -306,13 +258,9 @@ class CategoryService:
         doc = doc_ref.get()
         if not doc.exists:
             raise ValueError("Categoría no encontrada")
-        if doc.to_dict().get("estado") == "inactivo":
-            raise ValueError("No se puede modificar una categoría inactiva")
         validated_data = cls.validate_category_data(data)
-        # Solo actualizar los campos permitidos
-        allowed_fields = {"name", "description", "updated_at", "estado"}
-        filtered_data = {k: v for k, v in validated_data.items() if k in allowed_fields}
-        doc_ref.update(filtered_data)
+        validated_data["updated_at"] = SERVER_TIMESTAMP
+        doc_ref.update(validated_data)
         return {"id": doc_ref.id, **doc_ref.get().to_dict()}
 
     @classmethod
@@ -337,8 +285,7 @@ class CategoryService:
                 "name": "Uncategorized",
                 "description": "Productos sin categoría asignada",
                 "created_at": SERVER_TIMESTAMP,
-                "updated_at": SERVER_TIMESTAMP,
-                "estado": "activo"
+                "updated_at": SERVER_TIMESTAMP
             })
         
         # Reasignar productos y contar
@@ -378,13 +325,3 @@ class CategoryService:
                 "description": "Productos para el hogar"
             }
         ]
-
-    @classmethod
-    def set_status(cls, category_id: str, status: str) -> Dict:
-        """Cambia el estado de una categoría (solo actualiza el campo 'estado')"""
-        doc_ref = cls._get_db().collection("categories").document(category_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            raise ValueError("Categoría no encontrada")
-        doc_ref.update({"estado": status, "updated_at": SERVER_TIMESTAMP})
-        return {"id": category_id, "estado": status}
