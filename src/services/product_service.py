@@ -314,14 +314,12 @@ class CategoryService:
         
         # Reasignar productos y contar
         query = products_ref.where("category_id", "==", category_id)
-        batch = cls._get_db().batch()
+        products = list(query.stream())
         products_reassigned = 0
-        
-        for doc in query.stream():
+        batch = cls._get_db().batch()
+        for doc in products:
             batch.update(doc.reference, {"category_id": "uncategorized"})
             products_reassigned += 1
-        
-        # Eliminar categoría
         batch.delete(category_ref)
         batch.commit()
         
