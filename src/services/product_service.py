@@ -198,7 +198,7 @@ class ProductService:
     def get_by_id(cls, product_id: str, include_category: bool = False) -> Optional[Dict]:
         doc_ref = cls._get_db().collection("products").document(product_id)
         doc = doc_ref.get()
-        if not doc.exists() or doc.to_dict().get("estado") != "activo":
+        if not doc.exists or doc.to_dict().get("estado") != "activo":
             return None
         product_data = {"id": doc.id, **doc.to_dict()}
         if include_category:
