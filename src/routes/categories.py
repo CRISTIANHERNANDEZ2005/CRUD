@@ -83,3 +83,18 @@ def delete_category(category_id):
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@categories_bp.route('/<category_id>/estado', methods=['PATCH'])
+@require_jwt
+def set_category_status(category_id):
+    try:
+        data = request.get_json()
+        status = data.get('estado')
+        if status not in ['activo', 'inactivo']:
+            return jsonify({'error': 'Estado inválido, debe ser "activo" o "inactivo"'}), 400
+        result = CategoryService.set_status(category_id, status)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

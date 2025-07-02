@@ -50,7 +50,8 @@ class ProductService:
                     "name": "Uncategorized",
                     "description": "Productos sin categoría asignada",
                     "created_at": SERVER_TIMESTAMP,
-                    "updated_at": SERVER_TIMESTAMP
+                    "updated_at": SERVER_TIMESTAMP,
+                    "estado": "activo"
                 })
             data["category_id"] = "uncategorized"
         
@@ -60,6 +61,8 @@ class ProductService:
         validated_data = data.copy()
         validated_data["created_at"] = SERVER_TIMESTAMP
         validated_data["updated_at"] = SERVER_TIMESTAMP
+        if "estado" not in validated_data:
+            validated_data["estado"] = "activo"
         
         return validated_data
 
@@ -87,6 +90,11 @@ class ProductService:
         if not doc_ref.get().exists:
             raise ValueError("Producto no encontrado")
         
+        doc = doc_ref.get()
+        
+        if doc.to_dict().get("estado") == "inactivo":
+            raise ValueError("No se puede modificar un producto inactivo")
+        
         validated_data = cls.validate_product_data(data)
         validated_data["updated_at"] = SERVER_TIMESTAMP
         
@@ -109,7 +117,7 @@ class ProductService:
             raise ValueError("Categoría no encontrada")
         
         products_ref = cls._get_db().collection("products")
-        query = products_ref.where("category_id", "==", category_id)
+        query = products_ref.where("category_id", "==", category_id).where("estado", "==", "activo")
         
         return [{"id": doc.id, **doc.to_dict()} for doc in query.stream()] 
 
@@ -175,7 +183,7 @@ class ProductService:
     def get_all(cls, include_category: bool = False) -> List[Dict]:
         products_ref = cls._get_db().collection("products")
         products = []
-        for doc in products_ref.stream():
+        for doc in products_ref.where("estado", "==", "activo").stream():
             product_data = {"id": doc.id, **doc.to_dict()}
             if include_category:
                 category = cls._get_db().collection("categories").document(product_data.get("category_id")).get()
@@ -188,7 +196,7 @@ class ProductService:
     def get_by_id(cls, product_id: str, include_category: bool = False) -> Optional[Dict]:
         doc_ref = cls._get_db().collection("products").document(product_id)
         doc = doc_ref.get()
-        if not doc.exists:
+        if not doc.exists() or doc.to_dict().get("estado") != "activo":
             return None
         product_data = {"id": doc.id, **doc.to_dict()}
         if include_category:
@@ -196,6 +204,18 @@ class ProductService:
             if category.exists:
                 product_data["category"] = {"id": category.id, **category.to_dict()}
         return product_data
+
+    @classmethod
+    def set_status(cls, product_id: str, status: str) -> Dict:
+        """Cambia el estado de un producto individual"""
+        doc_ref = cls._get_db().collection("products").document(product_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            raise ValueError("Producto no encontrado")
+        batch = cls._get_db().batch()
+        batch.update(doc_ref, {"estado": status, "updated_at": SERVER_TIMESTAMP})
+        batch.commit()
+        return {"id": product_id, "estado": status}
 
 
 class CategoryService:
@@ -223,6 +243,8 @@ class CategoryService:
         validated_data = data.copy()
         validated_data["created_at"] = SERVER_TIMESTAMP
         validated_data["updated_at"] = SERVER_TIMESTAMP
+        if "estado" not in validated_data:
+            validated_data["estado"] = "activo"
         
         return validated_data
 
@@ -284,6 +306,11 @@ class CategoryService:
         if not doc_ref.get().exists:
             raise ValueError("Categoría no encontrada")
         
+        doc = doc_ref.get()
+        
+        if doc.to_dict().get("estado") == "inactivo":
+            raise ValueError("No se puede modificar una categoría inactiva")
+        
         validated_data = cls.validate_category_data(data)
         validated_data["updated_at"] = SERVER_TIMESTAMP
         
@@ -309,7 +336,8 @@ class CategoryService:
                 "name": "Uncategorized",
                 "description": "Productos sin categoría asignada",
                 "created_at": SERVER_TIMESTAMP,
-                "updated_at": SERVER_TIMESTAMP
+                "updated_at": SERVER_TIMESTAMP,
+                "estado": "activo"
             })
         
         # Reasignar productos y contar
@@ -349,3 +377,20 @@ class CategoryService:
                 "description": "Productos para el hogar"
             }
         ]
+
+    @classmethod
+    def set_status(cls, category_id: str, status: str) -> Dict:
+        """Cambia el estado de una categoría y de todos sus productos"""
+        doc_ref = cls._get_db().collection("categories").document(category_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            raise ValueError("Categoría no encontrada")
+        batch = cls._get_db().batch()
+        batch.update(doc_ref, {"estado": status, "updated_at": SERVER_TIMESTAMP})
+        # Cambiar estado de todos los productos de la categoría
+        products_ref = cls._get_db().collection("products")
+        query = products_ref.where("category_id", "==", category_id)
+        for prod in query.stream():
+            batch.update(prod.reference, {"estado": status, "updated_at": SERVER_TIMESTAMP})
+        batch.commit()
+        return {"id": category_id, "estado": status}

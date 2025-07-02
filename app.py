@@ -20,6 +20,12 @@ from src import create_app
 
 app = create_app()
 
+"""
+git add .
+git commit -m "eliminar correctamente"
+git push -u origin main --force
+"""
+
 # Gunicorn busca la variable 'app' por defecto
 # if __name__ == "__main__":
 #     app.run(debug=True)

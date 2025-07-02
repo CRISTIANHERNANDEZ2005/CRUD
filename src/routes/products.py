@@ -142,3 +142,18 @@ def create_batch_products():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@products_bp.route('/<product_id>/estado', methods=['PATCH'])
+@require_jwt
+def set_product_status(product_id):
+    try:
+        data = request.get_json()
+        status = data.get('estado')
+        if status not in ['activo', 'inactivo']:
+            return jsonify({'error': 'Estado inválido, debe ser "activo" o "inactivo"'}), 400
+        result = ProductService.set_status(product_id, status)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
