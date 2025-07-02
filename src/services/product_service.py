@@ -251,11 +251,12 @@ class CategoryService:
 
     @classmethod
     def create(cls, data: Dict) -> Dict:
-        """Crear una nueva categoría"""
         validated_data = cls.validate_category_data(data)
+        # Solo guardar los campos permitidos
+        allowed_fields = {"name", "description", "created_at", "updated_at", "estado"}
+        filtered_data = {k: v for k, v in validated_data.items() if k in allowed_fields}
         doc_ref = cls._get_db().collection("categories").document()
-        doc_ref.set(validated_data)
-        # Obtener los datos ya guardados (con los timestamps reales)
+        doc_ref.set(filtered_data)
         doc = doc_ref.get()
         return {"id": doc.id, **doc.to_dict()}
 
@@ -301,21 +302,17 @@ class CategoryService:
 
     @classmethod
     def update(cls, category_id: str, data: Dict) -> Dict:
-        """Actualizar una categoría existente"""
         doc_ref = cls._get_db().collection("categories").document(category_id)
-        
         doc = doc_ref.get()
-        
         if not doc.exists:
             raise ValueError("Categoría no encontrada")
-        
         if doc.to_dict().get("estado") == "inactivo":
             raise ValueError("No se puede modificar una categoría inactiva")
-        
         validated_data = cls.validate_category_data(data)
-        validated_data["updated_at"] = SERVER_TIMESTAMP
-        
-        doc_ref.update(validated_data)
+        # Solo actualizar los campos permitidos
+        allowed_fields = {"name", "description", "updated_at", "estado"}
+        filtered_data = {k: v for k, v in validated_data.items() if k in allowed_fields}
+        doc_ref.update(filtered_data)
         return {"id": doc_ref.id, **doc_ref.get().to_dict()}
 
     @classmethod
