@@ -42,7 +42,7 @@ def create_product():
             return jsonify({"error": "La descripción debe ser un string de máximo 500 caracteres"}), 400
 
         category_ref = ProductService._get_db().collection("categories").document(data["category_id"])
-        if not category_ref.get().exists:
+        if not category_ref.exists:
             raise ValueError(f"La categoría '{data['category_id']}' no existe. Por favor, crea la categoría antes de asignarla a un producto.")
 
         new_product = ProductService.create(data)
