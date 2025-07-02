@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Dict, Any
 from firebase_admin import firestore
+import re
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 
 SCHEMAS = {
     "products": {
@@ -61,10 +63,25 @@ def validate_document(collection: str, data: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError(f"Campo requerido faltante: {field}")
     
     # Campos automáticos
-    now = firestore.SERVER_TIMESTAMP
+    now = SERVER_TIMESTAMP
     if "created_at" in schema["fields"] and "created_at" not in validated_data:
         validated_data["created_at"] = now
     if "updated_at" in schema["fields"]:
         validated_data["updated_at"] = now
     
     return validated_data
+
+def is_valid_email(email: str) -> bool:
+    """Valida el formato del email usando una expresión regular simple."""
+    pattern = r"^[\w\.-]+@[\w\.-]+\.\w{2,}$"
+    return re.match(pattern, email) is not None
+
+def is_strong_password(password: str) -> bool:
+    """Valida que la contraseña tenga al menos 6 caracteres, una letra y un número."""
+    if len(password) < 6:
+        return False
+    if not re.search(r"[A-Za-z]", password):
+        return False
+    if not re.search(r"\d", password):
+        return False
+    return True

@@ -6,6 +6,7 @@ from .firestore_db import get_firestore_client
 import os
 from flask import request
 from functools import wraps
+from .schemas import is_valid_email, is_strong_password
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'supersecretkey')
 JWT_ALGORITHM = 'HS256'
@@ -22,6 +23,10 @@ class AuthService:
 
     @classmethod
     def register(cls, email: str, password: str) -> dict:
+        if not is_valid_email(email):
+            raise ValueError('El email no tiene un formato válido')
+        if not is_strong_password(password):
+            raise ValueError('La contraseña debe tener al menos 6 caracteres, una letra y un número')
         users_ref = cls._get_db().collection('users')
         if users_ref.where('email', '==', email).get():
             raise ValueError('El usuario ya existe')
@@ -37,6 +42,8 @@ class AuthService:
 
     @classmethod
     def login(cls, email: str, password: str) -> str:
+        if not is_valid_email(email):
+            raise ValueError('El email no tiene un formato válido')
         users_ref = cls._get_db().collection('users')
         user_docs = users_ref.where('email', '==', email).get()
         if not user_docs:
